@@ -27,10 +27,17 @@ pipeline {
       }
     }
 
-    stage('3. Run Unit Tests') {
+    stage('3. Run API Tests using Postman') {
       steps {
         sh '''
-      . venv/bin/activate
+          docker build -t $ECR_REPO:$BUILD_TAG .
+          docker run -d -p 8080:8080 --name python-demo-test $ECR_REPO:$BUILD_TAG
+          sleep 10
+
+          docker run --network=host -v $PWD/tests:/etc/newman postman/newman:alpine run /etc/newman/postman_collection.json \
+            --env-var apphost=localhost
+
+          docker rm -f python-demo-test
         '''
       }
     }
@@ -68,7 +75,7 @@ pipeline {
       }
     }
 
-    stage('6. Docker Build') {
+    stage('6. Docker Build (Final Image)') {
       steps {
         sh '''
           docker build -t $ECR_REPO:$BUILD_TAG .
