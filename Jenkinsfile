@@ -117,7 +117,7 @@ pipeline {
 
             git config --global user.email "mspr9773@gmail.com"
             git config --global user.name "M Surya Prasad"
-            git add k8s/deployment.yaml
+            git add kubernetes/deployment.yaml
             git commit -m "Update image tag to ${BUILD_TAG}"
             git push origin main
           """
