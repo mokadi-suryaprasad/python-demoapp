@@ -5,7 +5,7 @@ pipeline {
     AWS_REGION = "ap-south-1"
     ECR_REPO = "development/namespace"
     SONAR_TOKEN = credentials('SONAR_TOKEN')
-    BUILD_TAG = "${BUILD_NUMBER}"  // Jenkins build number as Docker tag
+    BUILD_TAG = "${BUILD_NUMBER}"
   }
 
   stages {
@@ -18,13 +18,13 @@ pipeline {
 
     stage('2. Install Dependencies') {
       steps {
-        sh 'pip install -r python-service/requirements.txt'
+        sh 'pip install -r src/app/requirements.txt'
       }
     }
 
     stage('3. Run Unit Tests') {
       steps {
-        sh 'pytest python-service/tests'
+        sh 'pytest src/tests'
       }
     }
 
@@ -102,7 +102,7 @@ pipeline {
         sh '''
           docker run -d -p 8080:8080 --name python-test $ECR_REPO:$BUILD_TAG
           sleep 10
-          docker run -t owasp/zap2docker-stable zap-baseline.py -t http://host.docker.internal:8080 || true
+          docker run --network="host" -t owasp/zap2docker-stable zap-baseline.py -t http://localhost:8080 || true
           docker rm -f python-test
         '''
       }
@@ -113,13 +113,13 @@ pipeline {
         script {
           def ecr_url = "023703779855.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
           sh """
-            sed -i "s|image: .*|image: ${ecr_url}:${BUILD_TAG}|" k8s/deployment.yaml
+            sed -i "s|image: .*|image: ${ecr_url}:${BUILD_TAG}|" deploy/kubernetes/deployment.yaml
 
             git config --global user.email "mspr9773@gmail.com"
             git config --global user.name "M Surya Prasad"
             git add deploy/kubernetes/deployment.yaml
             git commit -m "Update image tag to ${BUILD_TAG}"
-            git push origin main
+            git push origin master
           """
         }
       }
