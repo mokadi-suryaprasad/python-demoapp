@@ -18,13 +18,21 @@ pipeline {
 
     stage('2. Install Dependencies') {
       steps {
-        sh 'pip install -r src/app/requirements.txt'
+        sh '''
+          python3 -m venv venv
+          . venv/bin/activate
+          pip install --upgrade pip
+          pip install -r src/app/requirements.txt
+        '''
       }
     }
 
     stage('3. Run Unit Tests') {
       steps {
-        sh 'pytest src/tests'
+        sh '''
+          . venv/bin/activate
+          pytest src/tests
+        '''
       }
     }
 
@@ -36,7 +44,7 @@ pipeline {
         sh '''
           ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
           -Dsonar.projectKey=python-app \
-          -Dsonar.sources=python-service \
+          -Dsonar.sources=src/app \
           -Dsonar.language=py \
           -Dsonar.host.url=http://13.233.178.43:9000 \
           -Dsonar.login=$SONAR_TOKEN
@@ -53,7 +61,7 @@ pipeline {
           credentialsId: 'aws-credentials'
         ]]) {
           sh '''
-            zip -r python-artifact.zip python-service
+            zip -r python-artifact.zip src/app
             DATE=$(date +%F)
             aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-$BUILD_TAG.zip
           '''
