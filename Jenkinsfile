@@ -12,7 +12,7 @@ pipeline {
 
     stage('1. Checkout Code') {
       steps {
-        git credentialsId: 'github-creds', url: 'https://github.com/mokadi-suryaprasad/python-demoapp.git', branch: 'main'
+        git credentialsId: 'github-creds', url: 'https://github.com/mokadi-suryaprasad/python-demoapp.git', branch: 'master'
       }
     }
 
