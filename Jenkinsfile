@@ -4,7 +4,6 @@ pipeline {
   environment {
     AWS_REGION = "ap-south-1"
     ECR_REPO = "development/namespace"
-    SONAR_TOKEN = credentials('SONAR_TOKEN')
     BUILD_TAG = "${BUILD_NUMBER}"
   }
 
@@ -36,23 +35,22 @@ pipeline {
       }
     }
 
-    stage('SonarQube Scan') {
-  steps {
-    echo '🔍 Running SonarQube Scan for Python project'
+    stage('4. SonarQube Scan') {
+      steps {
+        echo '🔍 Running SonarQube Scan for Python project'
 
-    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
-      sh '''
-        sonar-scanner \
-        -Dsonar.projectKey=python-app \
-        -Dsonar.sources=src \
-        -Dsonar.language=py \
-        -Dsonar.host.url=http://100.26.227.191:9000 \
-        -Dsonar.login=$SONAR_LOGIN
-      '''
+        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
+          sh '''
+            sonar-scanner \
+              -Dsonar.projectKey=python-app \
+              -Dsonar.sources=src \
+              -Dsonar.language=py \
+              -Dsonar.host.url=http://100.26.227.191:9000 \
+              -Dsonar.login=$SONAR_LOGIN
+          '''
+        }
+      }
     }
-  }
-}
-}
 
     stage('5. Upload Artifact to S3 (with Date)') {
       steps {
@@ -65,7 +63,7 @@ pipeline {
           sh '''
             zip -r python-artifact.zip src
             DATE=$(date +%F)
-            aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-$BUILD_TAG.zip
+            aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-$BUILD_TAG.zip --region $AWS_REGION
           '''
         }
       }
@@ -96,7 +94,7 @@ pipeline {
           credentialsId: 'aws-credentials'
         ]]) {
           sh '''
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --region $AWS_REGION)
             aws ecr get-login-password --region $AWS_REGION | \
               docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
