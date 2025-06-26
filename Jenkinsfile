@@ -37,20 +37,17 @@ pipeline {
     }
 
     stage('4. SonarQube Scan') {
-      environment {
-        SONAR_SCANNER_HOME = tool 'sonar-scanner'
-      }
-      steps {
-        sh '''
-          ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
-          -Dsonar.projectKey=python-app \
-          -Dsonar.sources=src \
-          -Dsonar.language=py \
-          -Dsonar.host.url=http://13.233.178.43:9000 \
-          -Dsonar.login=$SONAR_TOKEN
-        '''
-      }
-    }
+  steps {
+    sh '''
+      sonar-scanner \
+        -Dsonar.projectKey=python-app \
+        -Dsonar.sources=src \
+        -Dsonar.language=py \
+        -Dsonar.host.url=http://13.233.178.43:9000 \
+        -Dsonar.login=$SONAR_TOKEN
+    '''
+  }
+}
 
     stage('5. Upload Artifact to S3 (with Date)') {
       steps {
