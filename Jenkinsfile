@@ -16,7 +16,7 @@ pipeline {
       }
     }
 
-    stage('2. Install Dependencies') {
+    stage('2. Setup Python Virtual Environment & Install Dependencies') {
       steps {
         sh '''
           python3 -m venv venv
@@ -61,7 +61,7 @@ pipeline {
           credentialsId: 'aws-credentials'
         ]]) {
           sh '''
-            zip -r python-artifact.zip src/app
+            zip -r python-artifact.zip src
             DATE=$(date +%F)
             aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-$BUILD_TAG.zip
           '''
