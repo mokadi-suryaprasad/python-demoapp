@@ -1,6 +1,11 @@
 pipeline {
   agent any
 
+  tools {
+    // Automatically installs sonar-scanner tool configured in Jenkins
+    sonarScanner 'sonar-scanner'
+  }
+
   environment {
     AWS_REGION = "ap-south-1"
     ECR_REPO = "development/namespace"
@@ -26,29 +31,30 @@ pipeline {
       }
     }
 
-    stage('3. Run API Tests using Postman') {
+    stage('3. Run API Tests using Pytest') {
       steps {
         sh '''
-          echo "hello"
-          echo "pystest are done"
+          . venv/bin/activate
+          pytest tests/
         '''
       }
     }
 
     stage('4. SonarQube Scan') {
+      environment {
+        // Use the SONAR_TOKEN credential as SONAR_LOGIN inside this stage
+        SONAR_LOGIN = credentials('SONAR_TOKEN')
+      }
       steps {
         echo '🔍 Running SonarQube Scan for Python project'
-
-        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
-          sh '''
-            sonar-scanner \
-              -Dsonar.projectKey=python-app \
-              -Dsonar.sources=src \
-              -Dsonar.language=py \
-              -Dsonar.host.url=http://100.26.227.191:9000 \
-              -Dsonar.login=$SONAR_LOGIN
-          '''
-        }
+        sh '''
+          sonar-scanner \
+            -Dsonar.projectKey=python-app \
+            -Dsonar.sources=src \
+            -Dsonar.language=py \
+            -Dsonar.host.url=http://100.26.227.191:9000 \
+            -Dsonar.login=$SONAR_LOGIN
+        '''
       }
     }
 
@@ -63,7 +69,7 @@ pipeline {
           sh '''
             zip -r python-artifact.zip src
             DATE=$(date +%F)
-            aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-$BUILD_TAG.zip --region $AWS_REGION
+            aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-$BUILD_TAG.zip
           '''
         }
       }
@@ -94,7 +100,7 @@ pipeline {
           credentialsId: 'aws-credentials'
         ]]) {
           sh '''
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --region $AWS_REGION)
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
             aws ecr get-login-password --region $AWS_REGION | \
               docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
