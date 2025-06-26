@@ -1,10 +1,6 @@
 pipeline {
   agent any
 
-  tools {
-    sonarScanner 'sonar-scanner'  // Tool name as defined in Jenkins
-  }
-
   environment {
     AWS_REGION = "ap-south-1"
     ECR_REPO = "development/namespace"
