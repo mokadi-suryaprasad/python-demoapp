@@ -22,7 +22,7 @@ pipeline {
           python3 -m venv venv
           . venv/bin/activate
           pip install --upgrade pip
-          pip install -r src/app/requirements.txt
+          pip install -r src/requirements.txt
         '''
       }
     }
@@ -44,7 +44,7 @@ pipeline {
         sh '''
           ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
           -Dsonar.projectKey=python-app \
-          -Dsonar.sources=src/app \
+          -Dsonar.sources=src \
           -Dsonar.language=py \
           -Dsonar.host.url=http://13.233.178.43:9000 \
           -Dsonar.login=$SONAR_TOKEN
