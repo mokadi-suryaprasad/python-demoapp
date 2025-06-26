@@ -36,17 +36,22 @@ pipeline {
       }
     }
 
-    stage('4. SonarQube Scan') {
+    stage('SonarQube Scan') {
   steps {
-    sh '''
-      sonar-scanner \
+    echo '🔍 Running SonarQube Scan for Python project'
+
+    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
+      sh '''
+        sonar-scanner \
         -Dsonar.projectKey=python-app \
         -Dsonar.sources=src \
         -Dsonar.language=py \
-        -Dsonar.host.url=http://13.233.178.43:9000 \
-        -Dsonar.login=$SONAR_TOKEN
-    '''
+        -Dsonar.host.url=http://100.26.227.191:9000 \
+        -Dsonar.login=$SONAR_LOGIN
+      '''
+    }
   }
+}
 }
 
     stage('5. Upload Artifact to S3 (with Date)') {
