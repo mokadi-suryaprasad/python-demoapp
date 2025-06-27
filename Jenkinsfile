@@ -1,10 +1,6 @@
 pipeline {
   agent any
 
-  tools {
-    python 'Python3'
-  }
-
   environment {
     AWS_REGION = "ap-south-1"
     ECR_REPO = "development/namespace"
@@ -49,7 +45,7 @@ pipeline {
               -Dsonar.projectKey=python-app \
               -Dsonar.sources=src \
               -Dsonar.language=py \
-              -Dsonar.host.url=http://100.26.227.191:9000 \
+              -Dsonar.host.url=http://43.204.36.212:9000 \
               -Dsonar.login=$SONAR_TOKEN
           '''
         }
