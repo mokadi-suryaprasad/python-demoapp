@@ -9,7 +9,6 @@ pipeline {
   }
 
   stages {
-
     stage('1. Checkout Code') {
       steps {
         git credentialsId: 'github-creds', url: 'https://github.com/mokadi-suryaprasad/python-demoapp.git', branch: 'master'
@@ -31,7 +30,7 @@ pipeline {
       steps {
         sh '''
           . venv/bin/activate
-          pytest --maxfail=1 --disable-warnings -q
+          pytest tests --maxfail=1 --disable-warnings -q
         '''
       }
     }
@@ -45,6 +44,7 @@ pipeline {
               -Dsonar.projectKey=python-app \
               -Dsonar.sources=src \
               -Dsonar.language=py \
+              -Dsonar.python.version=3.13 \
               -Dsonar.host.url=http://43.204.36.212:9000 \
               -Dsonar.login=$SONAR_TOKEN
           '''
@@ -80,7 +80,7 @@ pipeline {
     stage('7. Trivy Image Scan') {
       steps {
         sh '''
-          trivy image $ECR_REPO:$BUILD_TAG --exit-code 1 --severity CRITICAL,HIGH || true
+          trivy image $ECR_REPO:$BUILD_TAG --exit-code 0 --severity CRITICAL,HIGH || true
         '''
       }
     }
