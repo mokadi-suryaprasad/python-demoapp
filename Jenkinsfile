@@ -1,6 +1,10 @@
 pipeline {
   agent any
 
+  tools {
+    python 'Python3'
+  }
+
   environment {
     AWS_REGION = "ap-south-1"
     ECR_REPO = "development/namespace"
@@ -27,11 +31,11 @@ pipeline {
       }
     }
 
-    stage('3. Run API Tests using Postman') {
+    stage('3. Run Unit Tests') {
       steps {
         sh '''
-          echo "hello"
-          echo "pystest are done"
+          . venv/bin/activate
+          pytest --maxfail=1 --disable-warnings -q
         '''
       }
     }
@@ -39,18 +43,20 @@ pipeline {
     stage('4. SonarQube Scan') {
       steps {
         echo '🔍 Running SonarQube Scan for Python project'
-        sh '''
-          sonar-scanner \
-            -Dsonar.projectKey=python-app \
-            -Dsonar.sources=src \
-            -Dsonar.language=py \
-            -Dsonar.host.url=http://100.26.227.191:9000 \
-            -Dsonar.login=$SONAR_TOKEN
-        '''
+        withSonarQubeEnv('sonar') {
+          sh '''
+            sonar-scanner \
+              -Dsonar.projectKey=python-app \
+              -Dsonar.sources=src \
+              -Dsonar.language=py \
+              -Dsonar.host.url=http://100.26.227.191:9000 \
+              -Dsonar.login=$SONAR_TOKEN
+          '''
+        }
       }
     }
 
-    stage('5. Upload Artifact to S3 (with Date)') {
+    stage('5. Upload Artifact to S3') {
       steps {
         withCredentials([[
           $class: 'AmazonWebServicesCredentialsBinding',
@@ -67,7 +73,7 @@ pipeline {
       }
     }
 
-    stage('6. Docker Build (Final Image)') {
+    stage('6. Docker Build') {
       steps {
         sh '''
           docker build -t $ECR_REPO:$BUILD_TAG .
@@ -75,7 +81,7 @@ pipeline {
       }
     }
 
-    stage('7. Trivy Scan') {
+    stage('7. Trivy Image Scan') {
       steps {
         sh '''
           trivy image $ECR_REPO:$BUILD_TAG --exit-code 1 --severity CRITICAL,HIGH || true
@@ -103,18 +109,24 @@ pipeline {
       }
     }
 
-    stage('9. OWASP ZAP DAST Scan') {
+    stage('9. OWASP ZAP DAST Scan & Report') {
       steps {
         sh '''
           docker run -d -p 8080:8080 --name python-test $ECR_REPO:$BUILD_TAG
-          sleep 10
-          docker run --network="host" -t owasp/zap2docker-stable zap-baseline.py -t http://localhost:8080 || true
+          sleep 15
+
+          docker run --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-stable \
+            zap-baseline.py \
+            -t http://localhost:8080 \
+            -r dast-report.html \
+            -J dast-report.json || true
+
           docker rm -f python-test
         '''
       }
     }
 
-    stage('10. Update K8s Deployment YAML') {
+    stage('10. Update K8s Deployment YAML & Git Push') {
       steps {
         script {
           def ecr_url = "023703779855.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
@@ -129,6 +141,18 @@ pipeline {
           """
         }
       }
+    }
+  }
+
+  post {
+    always {
+      echo '📋 Publishing OWASP ZAP DAST Report...'
+      publishHTML(target: [
+        reportDir: '.', 
+        reportFiles: 'dast-report.html', 
+        reportName: 'OWASP ZAP DAST Report'
+      ])
+      cleanWs()
     }
   }
 }
