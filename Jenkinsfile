@@ -30,7 +30,7 @@ pipeline {
    steps {
      sh '''
       . venv/bin/activate
-      sh 'pytest src/tests --maxfail=1 --disable-warnings -q'
+      sh 'pytest tests --maxfail=1 --disable-warnings -q'
        '''
        }
      }
