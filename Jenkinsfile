@@ -26,14 +26,14 @@ pipeline {
       }
     }
 
-    stage('3. Run Unit Tests') {
-      steps {
-        sh '''
-          . venv/bin/activate
-          pytest tests --maxfail=1 --disable-warnings -q
-        '''
-      }
-    }
+  stage('3. Run Unit Tests') {
+   steps {
+     sh '''
+      . venv/bin/activate
+      pytest tests --maxfail=1 --disable-warnings -q
+       '''
+       }
+     }
 
     stage('4. SonarQube Scan') {
       steps {
