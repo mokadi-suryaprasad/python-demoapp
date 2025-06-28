@@ -103,29 +103,32 @@ pipeline {
     }
 
     stage('9. OWASP ZAP DAST Scan & Report') {
-      steps {
-          sh '''
-            set -e
+  steps {
+    sh '''
+      set -e
 
-            # Start your app container
-            docker run -d -p 8081:8080 --name python-zaptest $ECR_REPO:$BUILD_TAG
+      # Clean up old container if it exists
+      if [ "$(docker ps -aq -f name=python-zaptest)" ]; then
+        docker rm -f python-zaptest
+      fi
 
-            # Wait for app to be ready (tune this as needed)
-            sleep 20
+      # Start the app container for scanning
+      docker run -d -p 8081:8080 --name python-zaptest development/namespace:17
+      sleep 20
 
-            # Run OWASP ZAP baseline scan
-            docker run --rm --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-weekly \
-            zap-baseline.py \
-           -t http://localhost:8080 \
-           -r dast-report.html \
-           -J dast-report.json || true
+      # Run ZAP scan
+      docker run --rm --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-weekly \
+        zap-baseline.py \
+        -t http://localhost:8080 \
+        -r dast-report.html \
+        -J dast-report.json || true
 
-          # Stop and remove the app container
-          docker rm -f python-zaptest
-          '''
+      # Clean up again
+      docker rm -f python-zaptest || true
+    '''
+  }
+}
 
-      }
-    }
 
     stage('10. Update K8s Deployment YAML & Git Push') {
       steps {
