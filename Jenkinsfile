@@ -106,7 +106,7 @@ pipeline {
       steps {
         sh '''
           set -e
-          docker run -d -p 8081:8080 --name python-test $ECR_REPO:$BUILD_TAG
+          docker run -d -p 8081:8080 --name python-zaptest $ECR_REPO:$BUILD_TAG
           sleep 20
 
           docker run --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-stable \
