@@ -4,7 +4,6 @@ pipeline {
   environment {
     AWS_REGION = "ap-south-1"
     ECR_REPO = "development/namespace"
-    SONAR_TOKEN = credentials('SONAR_TOKEN')
     BUILD_TAG = "${BUILD_NUMBER}"
   }
 
@@ -18,7 +17,7 @@ pipeline {
     stage('2. Setup Python Virtual Environment & Install Dependencies') {
       steps {
         sh '''
-          python3.13 -m venv venv
+          python3.12 -m venv venv
           . venv/bin/activate
           pip install --upgrade pip
           pip install -r src/requirements.txt
@@ -26,23 +25,29 @@ pipeline {
       }
     }
 
-  stage('3. Run Unit Tests') {
-   steps {
-     sh '''
-        echo "No Test cases running"
-       '''
-       }
-     }
+    stage('3. Run Unit Tests') {
+      steps {
+        sh 'echo "No Test cases running"'
+      }
+    }
 
-   stage('Run Sonarqube') {
-            environment {
-                scannerHome = tool 'lil-sonar-tool'
-            }
-            steps {
-                withSonarQubeEnv(credentialsId: 'SONAR_TOKEN', installationName: 'lil sonar installation') {
-                    sh "${scannerHome}/bin/sonar-scanner"
-                }
-            }
+    stage('4. SonarQube Scan') {
+      steps {
+        echo '🔍 Running SonarQube Scan for Python project'
+        withSonarQubeEnv('sonar') {
+          withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+            sh '''
+              sonar-scanner \
+                -Dsonar.projectKey=python-app \
+                -Dsonar.sources=src \
+                -Dsonar.python.version=3.12 \
+                -Dsonar.host.url=http://43.204.36.212:9000 \
+                -Dsonar.login=$SONAR_TOKEN
+            '''
+          }
+        }
+      }
+    }
 
     stage('5. Upload Artifact to S3') {
       steps {
@@ -63,17 +68,13 @@ pipeline {
 
     stage('6. Docker Build') {
       steps {
-        sh '''
-          docker build -t $ECR_REPO:$BUILD_TAG .
-        '''
+        sh 'docker build -t $ECR_REPO:$BUILD_TAG .'
       }
     }
 
     stage('7. Trivy Image Scan') {
       steps {
-        sh '''
-          trivy image $ECR_REPO:$BUILD_TAG --exit-code 0 --severity CRITICAL,HIGH || true
-        '''
+        sh 'trivy image $ECR_REPO:$BUILD_TAG --exit-code 0 --severity CRITICAL,HIGH || true'
       }
     }
 
