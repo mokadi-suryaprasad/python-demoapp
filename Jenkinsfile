@@ -43,7 +43,7 @@ pipeline {
                 -Dsonar.projectKey=python-app \
                 -Dsonar.sources=src \
                 -Dsonar.python.version=3.12 \
-                -Dsonar.host.url=http://43.204.36.212:9000 \
+                -Dsonar.host.url=http://43.205.195.108:9000 \
                 -Dsonar.login=$SONAR_TOKEN
             '''
           }
