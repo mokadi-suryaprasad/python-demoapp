@@ -17,6 +17,7 @@ pipeline {
     stage('2. Setup Python Virtual Environment & Install Dependencies') {
       steps {
         sh '''
+          set -e
           python3.12 -m venv venv
           . venv/bin/activate
           pip install --upgrade pip
@@ -37,6 +38,7 @@ pipeline {
         withSonarQubeEnv('sonar') {
           withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
             sh '''
+              set -e
               sonar-scanner \
                 -Dsonar.projectKey=python-app \
                 -Dsonar.sources=src \
@@ -58,6 +60,7 @@ pipeline {
           credentialsId: 'aws-credentials'
         ]]) {
           sh '''
+            set -e
             zip -r python-artifact.zip src
             DATE=$(date +%F)
             aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-$BUILD_TAG.zip
@@ -87,6 +90,7 @@ pipeline {
           credentialsId: 'aws-credentials'
         ]]) {
           sh '''
+            set -e
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
             aws ecr get-login-password --region $AWS_REGION | \
               docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
@@ -101,8 +105,9 @@ pipeline {
     stage('9. OWASP ZAP DAST Scan & Report') {
       steps {
         sh '''
+          set -e
           docker run -d -p 8080:8080 --name python-test $ECR_REPO:$BUILD_TAG
-          sleep 15
+          sleep 20
 
           docker run --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-stable \
             zap-baseline.py \
@@ -120,13 +125,14 @@ pipeline {
         script {
           def ecr_url = "023703779855.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
           sh """
+            set -e
             sed -i "s|image: .*|image: ${ecr_url}:${BUILD_TAG}|" deploy/kubernetes/deployment.yaml
 
             git config --global user.email "mspr9773@gmail.com"
             git config --global user.name "M Surya Prasad"
             git add deploy/kubernetes/deployment.yaml
             git commit -m "Update image tag to ${BUILD_TAG}"
-            git push origin master
+            git push origin main
           """
         }
       }
