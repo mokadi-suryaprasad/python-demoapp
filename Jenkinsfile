@@ -103,53 +103,42 @@ pipeline {
     }
 
     stage('9. OWASP ZAP DAST Scan & Report') {
-  steps {
-    sh '''
-      set -e
-
-      # Clean up old container if it exists
-      if [ "$(docker ps -aq -f name=python-zaptest)" ]; then
-        docker rm -f python-zaptest
-      fi
-
-      # Start the app container for scanning
-      docker run -d -p 8081:8080 --name python-zaptest development/namespace:17
-      sleep 20
-
-      # Run ZAP scan
-      docker run --rm --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-weekly \
-        zap-baseline.py \
-        -t http://localhost:8080 \
-        -r dast-report.html \
-        -J dast-report.json || true
-
-      # Clean up again
-      docker rm -f python-zaptest || true
-    '''
-  }
-}
-
-
-stage('10. Update K8s Deployment YAML & Git Push') {
-  steps {
-    script {
-      def ecr_url = "023703779855.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
-      withCredentials([usernamePassword(credentialsId: 'github-creds', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-        sh """
+      steps {
+        sh '''
           set -e
-          sed -i "s|image: .*|image: ${ecr_url}:${BUILD_TAG}|" deploy/kubernetes/deployment.yaml
+          docker rm -f python-zaptest || true
+          docker run -d -p 8081:8080 --name python-zaptest development/namespace:17
+          sleep 20
+          docker run --rm --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-weekly \
+            zap-baseline.py \
+            -t http://localhost:8080 \
+            -r dast-report.html \
+            -J dast-report.json || true
+          docker rm -f python-zaptest || true
+        '''
+      }
+    }
 
-          git config --global user.email "mspr9773@gmail.com"
-          git config --global user.name "M Surya Prasad"
-          git add deploy/kubernetes/deployment.yaml
-          git commit -m "Update image tag to ${BUILD_TAG}" || echo 'No changes to commit'
-          git push https://${GIT_USER}:${GIT_PASS}@github.com/mokadi-suryaprasad/python-demoapp.git HEAD:main
-        """
+    stage('10. Update K8s Deployment YAML & Git Push') {
+      steps {
+        script {
+          def ecr_url = "023703779855.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+          withCredentials([usernamePassword(credentialsId: 'github-creds', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+            sh """
+              set -e
+              sed -i "s|image: .*|image: ${ecr_url}:${BUILD_TAG}|" deploy/kubernetes/deployment.yaml
+
+              git config --global user.email "mspr9773@gmail.com"
+              git config --global user.name "M Surya Prasad"
+              git add deploy/kubernetes/deployment.yaml
+              git commit -m "Update image tag to ${BUILD_TAG}" || echo 'No changes to commit'
+              git push https://${GIT_USER}:${GIT_PASS}@github.com/mokadi-suryaprasad/python-demoapp.git HEAD:main
+            """
+          }
+        }
       }
     }
   }
-}
-
 
   post {
     always {
