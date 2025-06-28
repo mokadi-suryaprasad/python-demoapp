@@ -34,22 +34,15 @@ pipeline {
        }
      }
 
-    stage('4. SonarQube Scan') {
-      steps {
-        echo '🔍 Running SonarQube Scan for Python project'
-        withSonarQubeEnv('sonar') {
-          sh '''
-            sonar-scanner \
-              -Dsonar.projectKey=python-app \
-              -Dsonar.sources=src \
-              -Dsonar.language=py \
-              -Dsonar.python.version=3.13 \
-              -Dsonar.host.url=http://43.204.36.212:9000 \
-              -Dsonar.login=$SONAR_TOKEN
-          '''
-        }
-      }
-    }
+   stage('Run Sonarqube') {
+            environment {
+                scannerHome = tool 'lil-sonar-tool'
+            }
+            steps {
+                withSonarQubeEnv(credentialsId: 'SONAR_TOKEN', installationName: 'lil sonar installation') {
+                    sh "${scannerHome}/bin/sonar-scanner"
+                }
+            }
 
     stage('5. Upload Artifact to S3') {
       steps {
