@@ -130,24 +130,26 @@ pipeline {
 }
 
 
-    stage('10. Update K8s Deployment YAML & Git Push') {
-      steps {
-        script {
-          def ecr_url = "023703779855.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
-          sh """
-            set -e
-            sed -i "s|image: .*|image: ${ecr_url}:${BUILD_TAG}|" deploy/kubernetes/deployment.yaml
+stage('10. Update K8s Deployment YAML & Git Push') {
+  steps {
+    script {
+      def ecr_url = "023703779855.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+      withCredentials([usernamePassword(credentialsId: 'github-creds', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+        sh """
+          set -e
+          sed -i "s|image: .*|image: ${ecr_url}:${BUILD_TAG}|" deploy/kubernetes/deployment.yaml
 
-            git config --global user.email "mspr9773@gmail.com"
-            git config --global user.name "M Surya Prasad"
-            git add deploy/kubernetes/deployment.yaml
-            git commit -m "Update image tag to ${BUILD_TAG}"
-            git push origin main
-          """
-        }
+          git config --global user.email "mspr9773@gmail.com"
+          git config --global user.name "M Surya Prasad"
+          git add deploy/kubernetes/deployment.yaml
+          git commit -m "Update image tag to ${BUILD_TAG}" || echo 'No changes to commit'
+          git push https://${GIT_USER}:${GIT_PASS}@github.com/mokadi-suryaprasad/python-demoapp.git HEAD:main
+        """
       }
     }
   }
+}
+
 
   post {
     always {
