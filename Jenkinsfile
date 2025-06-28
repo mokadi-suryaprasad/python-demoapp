@@ -38,7 +38,7 @@ pipeline {
         withSonarQubeEnv('sonar') {
           withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
             sh '''
-              set -e
+              export PATH=$PATH:/opt/sonar-scanner/bin
               sonar-scanner \
                 -Dsonar.projectKey=python-app \
                 -Dsonar.sources=src \
