@@ -1,5 +1,8 @@
 pipeline {
   agent any
+    tools {
+    sonarScanner 'sonar-scanner'
+  }
 
   environment {
     AWS_REGION = "ap-south-1"
