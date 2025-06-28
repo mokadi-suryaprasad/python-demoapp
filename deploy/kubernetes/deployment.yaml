@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: python-app
-        image: 023703779855.dkr.ecr.ap-south-1.amazonaws.com/development/namespace:27
+        image: 023703779855.dkr.ecr.ap-south-1.amazonaws.com/development/namespace:28
         ports:
         - containerPort: 5000
