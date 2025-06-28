@@ -104,19 +104,26 @@ pipeline {
 
     stage('9. OWASP ZAP DAST Scan & Report') {
       steps {
-        sh '''
-          set -e
-          docker run -d -p 8081:8080 --name python-zaptest $ECR_REPO:$BUILD_TAG
-          sleep 20
+          sh '''
+            set -e
 
-          docker run --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-stable \
+            # Start your app container
+            docker run -d -p 8081:8080 --name python-zaptest $ECR_REPO:$BUILD_TAG
+
+            # Wait for app to be ready (tune this as needed)
+            sleep 20
+
+            # Run OWASP ZAP baseline scan
+            docker run --rm --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-weekly \
             zap-baseline.py \
-            -t http://localhost:8080 \
-            -r dast-report.html \
-            -J dast-report.json || true
+           -t http://localhost:8080 \
+           -r dast-report.html \
+           -J dast-report.json || true
 
-          docker rm -f python-test
-        '''
+          # Stop and remove the app container
+          docker rm -f python-zaptest
+          '''
+
       }
     }
 
