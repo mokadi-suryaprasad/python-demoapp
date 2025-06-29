@@ -3,7 +3,7 @@ name: Python CI Pipeline
 on:
   push:
     branches:
-      - master
+      - main
 
 env:
   SONAR_HOST_URL: http://43.204.36.212:9000
