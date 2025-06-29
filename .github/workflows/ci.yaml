@@ -73,32 +73,19 @@ jobs:
       run: |
         echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
 
-    - name: 9. OWASP ZAP DAST Scan
+    - name: 9. Start Python App & Run OWASP ZAP DAST Scan
       run: |
-        docker run -d -p 8080:8080 --name python-test $ECR_REPO:${{ env.BUILD_TAG }}
-
-        for i in {1..10}; do
-          if curl -s http://localhost:8080 > /dev/null; then
-            echo "✅ App is reachable"
-            break
-          fi
-          echo "⏳ Waiting for app to be ready..."
-          sleep 5
-        done
-
         mkdir -p zap-output && chmod 777 zap-output
 
-        docker run --network="host" -v ${{ github.workspace }}/zap-output:/zap/wrk \
-          ghcr.io/zaproxy/zaproxy:latest zap-baseline.py \
-          -t http://localhost:8080 \
+        nohup python src/app.py &
+        sleep 15
+
+        curl -I http://localhost:8080 || echo "App not reachable"
+
+        docker run -v ${{ github.workspace }}/zap-output:/zap/wrk ghcr.io/zaproxy/zaproxy:latest zap-baseline.py \
+          -t http://host.docker.internal:8080 \
           -r /zap/wrk/dast-report.html \
           -J /zap/wrk/dast-report.json || true
-
-        docker rm -f python-test
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
     - name: 10. Update K8s Deployment YAML & Git Push
       run: |
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
