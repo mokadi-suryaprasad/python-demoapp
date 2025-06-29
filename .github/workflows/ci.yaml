@@ -24,7 +24,9 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-    - run: |
+
+    - name: Install Requirements
+      run: |
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
@@ -37,6 +39,7 @@ jobs:
       uses: github/codeql-action/init@v2
       with:
         languages: python
+
     - uses: github/codeql-action/analyze@v2
 
     - name: 5. Upload Artifact to S3
@@ -69,23 +72,31 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    - name: 🔐 DockerHub Login for OWASP ZAP
+    - name: 9. Start Python App in Background
       run: |
-        echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
-
-    - name: 9. Start Python App & Run OWASP ZAP DAST Scan
-      run: |
-        mkdir -p zap-output && chmod 777 zap-output
-
-        nohup python src/app.py &
+        pip install -r src/requirements.txt
+        cd src
+        nohup python run.py > server.log 2>&1 &
         sleep 15
+        curl -I http://localhost:5000 || echo "App not reachable"
 
-        curl -I http://localhost:8080 || echo "App not reachable"
+    - name: 🔍 Run OWASP ZAP Full Scan
+      uses: zaproxy/action-full-scan@v0.12.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
+        target: 'http://host.docker.internal:5000'
+        cmd_options: '-a -r zap-report.html -J zap-report.json'
 
-        docker run -v ${{ github.workspace }}/zap-output:/zap/wrk ghcr.io/zaproxy/zaproxy:latest zap-baseline.py \
-          -t http://host.docker.internal:8080 \
-          -r /zap/wrk/dast-report.html \
-          -J /zap/wrk/dast-report.json || true
+    - name: 📋 Upload ZAP DAST Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: zap-dast-report
+        path: |
+          zap-report.html
+          zap-report.json
+
     - name: 10. Update K8s Deployment YAML & Git Push
       run: |
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -100,10 +111,3 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-    - name: 📋 Publish OWASP ZAP DAST Report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: dast-report
-        path: zap-output/dast-report.html
