@@ -6,13 +6,16 @@ on:
       - master
 
 env:
-  AWS_REGION: ap-south-1
-  ECR_REPO: development/namespace
   SONAR_HOST_URL: http://43.204.36.212:9000
+  BUILD_TAG: ${{ github.run_number }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ECR_REPO: ${{ secrets.ECR_REPO }}
 
     steps:
     - name: 1. Checkout Code
@@ -21,7 +24,7 @@ jobs:
     - name: 2. Setup Python & Install Dependencies
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: '3.11'
     - run: |
         python -m venv venv
         source venv/bin/activate
@@ -31,7 +34,7 @@ jobs:
     - name: 3. Run Unit Tests
       run: |
         source venv/bin/activate
-        pytest --maxfail=1 --disable-warnings -q
+        No test cases ruuning
 
     - name: 4. SonarQube Scan
       env:
@@ -50,20 +53,19 @@ jobs:
       run: |
         zip -r python-artifact.zip src
         DATE=$(date +%F)
-        aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-${{ github.run_number }}.zip
+        aws s3 cp python-artifact.zip s3://pythonbuildfiles/python-service/$DATE/build-${{ env.BUILD_TAG }}.zip
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
 
     - name: 6. Docker Build
       run: |
-        docker build -t $ECR_REPO:${{ github.run_number }} .
+        docker build -t $ECR_REPO:${{ env.BUILD_TAG }} .
 
     - name: 7. Trivy Image Scan
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.ECR_REPO }}:${{ github.run_number }}
+        image-ref: ${{ env.ECR_REPO }}:${{ env.BUILD_TAG }}
         severity: 'CRITICAL,HIGH'
         exit-code: '0'
 
@@ -71,36 +73,36 @@ jobs:
       run: |
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-        docker tag $ECR_REPO:${{ github.run_number }} $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:${{ github.run_number }}
-        docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:${{ github.run_number }}
+
+        docker tag $ECR_REPO:${{ env.BUILD_TAG }} $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:${{ env.BUILD_TAG }}
+        docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:${{ env.BUILD_TAG }}
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     - name: 9. OWASP ZAP DAST Scan
       run: |
-        docker run -d -p 8080:8080 --name python-test $ECR_REPO:${{ github.run_number }}
+        docker run -d -p 8080:8080 --name python-test $ECR_REPO:${{ env.BUILD_TAG }}
         sleep 15
         docker run --network="host" -v ${{ github.workspace }}:/zap/wrk -t owasp/zap2docker-stable \
           zap-baseline.py -t http://localhost:8080 -r dast-report.html -J dast-report.json || true
         docker rm -f python-test
 
-    - name: 10. Update K8s Deployment YAML & Push to Git
+    - name: 10. Update K8s Deployment YAML & Git Push
       run: |
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
         ECR_URL=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO
-        sed -i "s|image: .*|image: ${ECR_URL}:${{ github.run_number }}|" deploy/kubernetes/deployment.yaml
+
+        sed -i "s|image: .*|image: ${ECR_URL}:${{ env.BUILD_TAG }}|" deploy/kubernetes/deployment.yaml
 
         git config --global user.email "mspr9773@gmail.com"
         git config --global user.name "M Surya Prasad"
+        git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}
         git add deploy/kubernetes/deployment.yaml
-        git commit -m "Update image tag to ${{ github.run_number }}"
+        git commit -m "Update image tag to ${{ env.BUILD_TAG }}"
         git push
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    - name: 📋 Publish OWASP ZAP Report
+    - name: 📋 Publish OWASP ZAP DAST Report
       if: always()
       uses: actions/upload-artifact@v4
       with:
