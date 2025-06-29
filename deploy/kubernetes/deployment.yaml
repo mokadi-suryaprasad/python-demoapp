@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
         - name: python-demoapp
-          image: 023703779855.dkr.ecr.ap-south-1.amazonaws.com/development/namespace:11
+          image: 023703779855.dkr.ecr.ap-south-1.amazonaws.com/development/namespace:12
           ports:
             - containerPort: 8080
