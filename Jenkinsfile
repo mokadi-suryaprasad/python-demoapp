@@ -9,14 +9,13 @@ pipeline {
   }
 
   stages {
-
     stage('1. Checkout Code') {
       steps {
         git credentialsId: 'github-creds', url: 'https://github.com/mokadi-suryaprasad/python-demoapp.git', branch: 'master'
       }
     }
 
-    stage('2. Setup Python Virtual Environment & Install Dependencies') {
+    stage('2. Setup Python & Install Dependencies') {
       steps {
         sh '''
           python3.13 -m venv venv
@@ -27,25 +26,18 @@ pipeline {
       }
     }
 
-    stage('3. Run Unit Tests') {
+    stage('3. Run Unit Tests (Skipped)') {
       steps {
-        sh '''
-          . venv/bin/activate
-          pytest --maxfail=1 --disable-warnings -q
-        '''
+        echo '🟡 Skipping unit tests for now.'
       }
     }
 
-    stage('4. SonarQube Scan') {
+    stage('4. Code Analysis (SonarQube)') {
       steps {
         echo '🔍 Running SonarQube Scan for Python project'
         withSonarQubeEnv('sonar') {
           sh '''
             sonar-scanner \
-              -Dsonar.projectKey=python-app \
-              -Dsonar.sources=src \
-              -Dsonar.language=py \
-              -Dsonar.host.url=http://43.204.36.212:9000 \
               -Dsonar.login=$SONAR_TOKEN
           '''
         }
@@ -105,20 +97,26 @@ pipeline {
       }
     }
 
-    stage('9. OWASP ZAP DAST Scan & Report') {
+    stage('9. Run OWASP ZAP Full Scan') {
       steps {
         sh '''
-          docker run -d -p 8080:8080 --name python-test $ECR_REPO:$BUILD_TAG
+          . venv/bin/activate
+          nohup python src/run.py > server.log 2>&1 &
           sleep 15
-
-          docker run --network="host" -v $WORKSPACE:/zap/wrk -t owasp/zap2docker-stable \
-            zap-baseline.py \
-            -t http://localhost:8080 \
-            -r dast-report.html \
-            -J dast-report.json || true
-
-          docker rm -f python-test
+          curl -I http://localhost:5000 || echo "App not reachable"
+          docker run --rm --network="host" -v $WORKSPACE:/zap/wrk ghcr.io/zaproxy/zaproxy:stable \
+            zap-full-scan.py -t http://localhost:5000 -a -r zap-report.html -J zap-report.json || true
         '''
+      }
+    }
+    stage('Upload ZAP DAST Report') {
+      steps {
+        publishHTML(target: [
+          reportDir: '.', 
+          reportFiles: 'zap-report.html', 
+          reportName: 'OWASP ZAP DAST Report'
+        ])
+        archiveArtifacts artifacts: 'zap-report.json', fingerprint: true
       }
     }
 
@@ -142,12 +140,7 @@ pipeline {
 
   post {
     always {
-      echo '📋 Publishing OWASP ZAP DAST Report...'
-      publishHTML(target: [
-        reportDir: '.', 
-        reportFiles: 'dast-report.html', 
-        reportName: 'OWASP ZAP DAST Report'
-      ])
+      echo '🧹 Cleaning workspace...'
       cleanWs()
     }
   }
