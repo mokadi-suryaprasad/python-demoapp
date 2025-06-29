@@ -33,12 +33,13 @@ jobs:
     - name: 3. Run Unit Tests (Skipped)
       run: echo "🟡 Unit tests are currently skipped."
 
-    # You can use CodeQL instead of SonarQube (since you requested alternatives)
-    - name: 4. CodeQL Static Analysis
+    - name: 4. CodeQL Static Analysis Init
       uses: github/codeql-action/init@v2
       with:
         languages: python
-    - uses: github/codeql-action/analyze@v2
+
+    - name: 4.2 CodeQL Analyze
+      uses: github/codeql-action/analyze@v2
 
     - name: 5. Upload Artifact to S3
       run: |
@@ -70,15 +71,11 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    - name: 🔐 DockerHub Login for OWASP ZAP
-      run: |
-        echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
-
     - name: 9. OWASP ZAP DAST Scan
       run: |
         docker run -d -p 8080:8080 --name python-test $ECR_REPO:${{ env.BUILD_TAG }}
         sleep 15
-        docker run --network="host" -v ${{ github.workspace }}:/zap/wrk -t owasp/zap2docker-stable \
+        docker run --network="host" -v ${{ github.workspace }}:/zap/wrk ghcr.io/zaproxy/zaproxy \
           zap-baseline.py -t http://localhost:8080 -r dast-report.html -J dast-report.json || true
         docker rm -f python-test
 
