@@ -31,10 +31,9 @@ jobs:
         pip install --upgrade pip
         pip install -r src/requirements.txt
 
-    - name: 3. Run Unit Tests
-      run: |
-        source venv/bin/activate
-        No test cases ruuning
+    - name: 3. Run Unit Tests (Skipped)
+      run: echo "🟡 Unit tests are currently skipped."
+
 
     - name: 4. SonarQube Scan
       env:
