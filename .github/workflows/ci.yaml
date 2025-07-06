@@ -32,7 +32,7 @@ jobs:
         pip install --upgrade pip
         pip install -r src/requirements.txt
     - name: 3. Run Unit Tests (Skipped)
-      run: echo "🟡 Unit tests are currently skipped."
+      run: echo "🟡 Unit tests are currently skippedd."
 
     - name: 4. CodeQL Static Analysis
       uses: github/codeql-action/init@v2
